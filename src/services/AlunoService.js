@@ -74,6 +74,18 @@ class AlunoService{
         }
     }
 
+    async delete(id){
+        id = this.validarInteiro(id, "id");
+        try{
+            return await prisma.aluno.delete({where: {id}});
+        }catch(error){
+            if(error.code === "P2025"){
+                throw new AlunoNaoEncontradoError();
+            }
+            throw error;
+        }
+    }
+
     async create(aluno){
         const {nome, email} = aluno;
         if(!nome || !email){
