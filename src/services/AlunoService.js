@@ -1,6 +1,10 @@
 const prisma = require("../databases/prisma");
 const AlunoInvalidoError = require("../errors/AlunoInvalidoError");
 const AlunoNaoEncontradoError = require("../errors/AlunoNaoEncontradoError");
+const EmailDuplicadoError = require("../errors/EmailDuplicadoError");
+const alunoSchema = require("../schemas/alunoSchema");
+
+const atualizacaoAlunoSchema = alunoSchema.partial();
 
 class AlunoService{
 
@@ -46,6 +50,28 @@ class AlunoService{
             throw new AlunoNaoEncontradoError();
         }
         return aluno;
+    }
+
+    async update(id, dados){
+        id = this.validarInteiro(id, "id");
+        const resultado = atualizacaoAlunoSchema.safeParse(dados);
+        if(!resultado.success){
+            throw new AlunoInvalidoError("Dados inválidos: informe nome e/ou email válidos.");
+        }
+        if(Object.keys(resultado.data).length === 0){
+            throw new AlunoInvalidoError("Informe nome e/ou email para atualizar o aluno.");
+        }
+        try{
+            return await prisma.aluno.update({where: {id}, data: resultado.data});
+        }catch(error){
+            if(error.code === "P2025"){
+                throw new AlunoNaoEncontradoError();
+            }
+            if(error.code === "P2002"){
+                throw new EmailDuplicadoError();
+            }
+            throw error;
+        }
     }
 
     async create(aluno){
