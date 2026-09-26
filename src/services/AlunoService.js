@@ -3,12 +3,39 @@ const AlunoInvalidoError = require("../errors/AlunoInvalidoError");
 
 class AlunoService{
 
-    async findMany(page, pageSize){
-        const alunos = await prisma.aluno.findMany({
-            skip: (page-1)*pageSize,
-            take: Number(pageSize)
-        });
-        return alunos;
+    validarInteiro(valor, campo){
+        if(!["string", "number"].includes(typeof valor) || !/^\d+$/.test(String(valor))){
+            throw new AlunoInvalidoError(`${campo} deve ser um inteiro positivo.`);
+        }
+        const numero = Number(valor);
+        if(!Number.isSafeInteger(numero) || numero < 1 || numero > 2147483647){
+            throw new AlunoInvalidoError(`${campo} deve ser um inteiro positivo válido.`);
+        }
+        return numero;
+    }
+
+    async findMany(page = 1, pageSize = 10, orderBy = "id", order = "asc"){
+        page = this.validarInteiro(page, "page");
+        pageSize = this.validarInteiro(pageSize, "pageSize");
+        const skip = (page - 1) * pageSize;
+        if(!Number.isSafeInteger(skip) || skip > 2147483647){
+            throw new AlunoInvalidoError("A paginação excede o limite permitido.");
+        }
+        if(!["id", "nome", "email", "createdAt", "updatedAt"].includes(orderBy)){
+            throw new AlunoInvalidoError("Campo de ordenação inválido.");
+        }
+        if(!["asc", "desc"].includes(order)){
+            throw new AlunoInvalidoError('A ordenação deve ser "asc" ou "desc".');
+        }
+        const [alunos, total] = await Promise.all([
+            prisma.aluno.findMany({
+                skip,
+                take: pageSize,
+                orderBy: orderBy === "id" ? {id: order} : [{[orderBy]: order}, {id: "asc"}]
+            }),
+            prisma.aluno.count()
+        ]);
+        return {alunos, total};
     }
 
     async create(aluno){
